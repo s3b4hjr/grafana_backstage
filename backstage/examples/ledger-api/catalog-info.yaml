@@ -1,0 +1,45 @@
+# Second example service — shows the hierarchy with more than one component and
+# a dependency edge (ledger-api depends on payments-api) inside payments-platform.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ledger-api
+  description: Double-entry ledger that posts payment transactions.
+  annotations:
+    backstage.io/techdocs-ref: dir:.
+    grafana/tag-selector: 'ledger-api'
+    grafana/alert-label-selector: 'app=ledger-api'
+  tags: [go, payments]
+spec:
+  type: service
+  lifecycle: production
+  owner: team-payments
+  system: payments-platform
+  providesApis:
+    - ledger-api-openapi
+  dependsOn:
+    - component:payments-api
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: ledger-api-openapi
+  description: HTTP API exposed by ledger-api.
+spec:
+  type: openapi
+  lifecycle: production
+  owner: team-payments
+  system: payments-platform
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: ledger-api
+      version: 1.0.0
+      description: Double-entry ledger postings.
+    paths:
+      /pay:
+        get:
+          summary: Post a debit/credit pair for a payment
+          responses:
+            '200': { description: posted }
+            '500': { description: ledger error }

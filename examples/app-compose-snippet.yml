@@ -1,0 +1,29 @@
+# How to wire one of YOUR app's containers into the stack. Copy the relevant
+# bits into your application's own docker-compose.yml.
+#
+# Logs are collected automatically (Alloy tails every container) — you only need
+# this if you also want metrics scraping and/or trace export.
+
+services:
+  my-app:
+    image: your/app:latest
+    networks:
+      - observability          # share the stack's network so names resolve
+    environment:
+      # Traces/metrics via OTLP -> Alloy gateway (use the service name, not localhost)
+      OTEL_SERVICE_NAME: my-app
+      OTEL_EXPORTER_OTLP_ENDPOINT: http://alloy:4318
+      OTEL_EXPORTER_OTLP_PROTOCOL: http/protobuf
+    labels:
+      # Optional: a friendlier log label than the container name
+      com.example.app: my-app
+
+# For Prometheus to scrape my-app:9000/metrics, add it to
+# config/prometheus/targets/apps.yml (no restart needed):
+#   - targets: ["my-app:9000"]
+#     labels: { app: my-app }
+
+networks:
+  observability:
+    external: true            # created by the observability stack (docker compose up)
+    name: observability

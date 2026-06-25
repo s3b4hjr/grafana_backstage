@@ -1,0 +1,31 @@
+# =============================================================================
+# Grafana plugin wiring for Backstage — MERGE these blocks into your Backstage
+# app-config.yaml (do not use this file standalone).
+#
+# Plugin: @backstage-community/plugin-grafana
+#   cd packages/app && yarn add @backstage-community/plugin-grafana
+#
+# It talks to Grafana through the Backstage backend proxy, so the Grafana API
+# token never reaches the browser.
+# =============================================================================
+
+# --- 1) Proxy: route /grafana/api through the backend with the API token -----
+proxy:
+  endpoints:
+    /grafana/api:
+      # Where THIS stack's Grafana lives, as seen from the Backstage backend:
+      #   • Backstage on the Docker host  -> http://localhost:3000
+      #   • Backstage in a container on `observability` -> http://grafana:3000
+      #   • Behind a reverse proxy        -> https://grafana.example.com
+      target: ${GRAFANA_URL}
+      headers:
+        # Grafana service-account token (Viewer role is enough). See README.
+        Authorization: Bearer ${GRAFANA_TOKEN}
+
+# --- 2) Plugin settings ------------------------------------------------------
+grafana:
+  # Used to build "open in Grafana" deep links in the UI.
+  domain: ${GRAFANA_URL}
+  # THIS stack defaults to Grafana *unified* alerting (see the repo's CLAUDE.md),
+  # so the plugin must query the unified alerting API, not the legacy one.
+  unifiedAlerting: true

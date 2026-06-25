@@ -1,0 +1,44 @@
+# Demo apps for the observability stack. Both are the SAME Go image, differing
+# only by OTEL_SERVICE_NAME + published port, so you can see the catalog/dashboards
+# with more than one service. They join the stack's `observability` network;
+# OTLP goes to alloy:4317 and Alloy tails their logs into Loki.
+#
+#   docker compose -f examples/payments-api-go/docker-compose.yml up -d --build
+#   (or: make demo-up)
+#
+# Prometheus targets (config/prometheus/targets/{payments-api,ledger-api}.yml)
+# point at the service names on the network; auto-reloaded in ~30s.
+services:
+  payments-api:
+    build: .
+    image: observability-demo-app:latest
+    container_name: payments-api
+    networks: [observability]
+    environment:
+      OTEL_SERVICE_NAME: payments-api
+      OTLP_ENDPOINT: alloy:4317
+      ENV: local
+      SELF_TRAFFIC: "true"
+    ports:
+      - "8000:8000"
+
+  ledger-api:
+    image: observability-demo-app:latest   # reuses the image built by payments-api
+    container_name: ledger-api
+    depends_on: [payments-api]
+    networks: [observability]
+    environment:
+      OTEL_SERVICE_NAME: ledger-api
+      OTLP_ENDPOINT: alloy:4317
+      ENV: local
+      SELF_TRAFFIC: "true"
+      # Distributed tracing: every ledger-api request calls payments-api,
+      # producing one trace across both services (+ a Tempo service-graph edge).
+      DOWNSTREAM_URL: http://payments-api:8000/pay
+    ports:
+      - "8001:8000"
+
+networks:
+  observability:
+    external: true
+    name: observability

@@ -1,0 +1,80 @@
+// =============================================================================
+// Grafana Alloy — unified collection agent.
+//   • Discovers Docker containers and ships their logs to Loki.
+//   • Acts as the OTLP gateway (gRPC :4317 / HTTP :4318) -> Tempo.
+// Alloy's own metrics are exposed on :12345/metrics and scraped by Prometheus.
+// =============================================================================
+
+// ----------------------------------------------------------------- LOGS -----
+// On Docker Desktop the socket may live elsewhere; the compose mount maps it to
+// /var/run/docker.sock inside the container regardless of host OS.
+discovery.docker "containers" {
+  host = "unix:///var/run/docker.sock"
+}
+
+// Promote useful Docker metadata to log labels.
+discovery.relabel "containers" {
+  targets = discovery.docker.containers.targets
+
+  rule {
+    source_labels = ["__meta_docker_container_name"]
+    regex         = "/(.*)"
+    target_label  = "container"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_log_stream"]
+    target_label  = "stream"
+  }
+  rule {
+    source_labels = ["__meta_docker_container_label_com_docker_compose_project"]
+    target_label  = "compose_project"
+  }
+}
+
+loki.source.docker "containers" {
+  host       = "unix:///var/run/docker.sock"
+  targets    = discovery.relabel.containers.output
+  labels     = { job = "docker" }
+  forward_to = [loki.process.containers.receiver]
+}
+
+loki.process "containers" {
+  stage.docker { }
+  forward_to = [loki.write.default.receiver]
+}
+
+loki.write "default" {
+  endpoint {
+    url = "http://loki:3100/loki/api/v1/push"
+  }
+}
+
+// ---------------------------------------------------------------- TRACES -----
+// Single OTLP entry point for applications. Batches and forwards to Tempo.
+otelcol.receiver.otlp "default" {
+  grpc {
+    endpoint = "0.0.0.0:4317"
+  }
+  http {
+    endpoint = "0.0.0.0:4318"
+  }
+
+  output {
+    traces = [otelcol.processor.batch.default.input]
+  }
+}
+
+otelcol.processor.batch "default" {
+  output {
+    traces = [otelcol.exporter.otlp.tempo.input]
+  }
+}
+
+otelcol.exporter.otlp "tempo" {
+  client {
+    endpoint = "tempo:4317"
+    tls {
+      insecure = true
+    }
+  }
+}

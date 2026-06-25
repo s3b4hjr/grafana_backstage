@@ -1,0 +1,20 @@
+# Local secrets / per-environment overrides
+.env
+*.env.local
+docker-compose.override.yml
+
+# Runtime data (if any bind-mounted dirs are used)
+data/
+*.log
+
+# Volume backups produced by scripts/backup.sh
+backups/
+
+# Community dashboards pulled by scripts/fetch-dashboards.sh (regenerable)
+dashboards/community/
+
+# OS / editor noise
+.DS_Store
+.idea/
+.vscode/
+*.swp

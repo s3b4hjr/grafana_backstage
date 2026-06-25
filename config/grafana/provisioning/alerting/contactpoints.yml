@@ -1,0 +1,57 @@
+# Contact points = WHERE notifications go. Manage these here (as code) OR
+# point-and-click in Grafana → Alerting → Contact points (stored in grafana-data).
+# The default below is email; uncomment a block for Slack/Discord/Telegram/webhook.
+# After editing: `make restart S=grafana`.
+
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: default
+    receivers:
+      - uid: default-email
+        type: email
+        settings:
+          # Change this address. Email delivery needs SMTP — set GF_SMTP_* in .env.
+          addresses: admin@example.com
+        disableResolveMessage: false
+
+  # ---- Slack (incoming webhook) — uncomment & fill ------------------------
+  # - orgId: 1
+  #   name: slack
+  #   receivers:
+  #     - uid: slack-1
+  #       type: slack
+  #       settings:
+  #         url: https://hooks.slack.com/services/XXX/YYY/ZZZ
+  #         title: '{{ template "default.title" . }}'
+  #         text: '{{ template "default.message" . }}'
+
+  # ---- Discord ------------------------------------------------------------
+  # - orgId: 1
+  #   name: discord
+  #   receivers:
+  #     - uid: discord-1
+  #       type: discord
+  #       settings:
+  #         url: https://discord.com/api/webhooks/XXX/YYY
+
+  # ---- Telegram -----------------------------------------------------------
+  # - orgId: 1
+  #   name: telegram
+  #   receivers:
+  #     - uid: telegram-1
+  #       type: telegram
+  #       settings:
+  #         bottoken: 123456:ABC-DEF
+  #         chatid: "-1001234567890"
+
+  # ---- Generic webhook (e.g. your own service, Alertmanager, etc.) --------
+  # - orgId: 1
+  #   name: webhook
+  #   receivers:
+  #     - uid: webhook-1
+  #       type: webhook
+  #       settings:
+  #         url: http://your-service:9000/alert
+  #         httpMethod: POST

@@ -1,0 +1,26 @@
+# Organization model — the teams that OWN things in the catalog.
+# Every Component/API/System references one of these Groups via `spec.owner`,
+# which is what makes "owned by my team" views and ownership relations work.
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: platform
+  description: Platform / SRE — owns the observability stack and the golden-path templates.
+spec:
+  type: team
+  profile:
+    displayName: Platform / SRE
+  children: []
+  members: [guest]
+---
+apiVersion: backstage.io/v1alpha1
+kind: Group
+metadata:
+  name: team-payments
+  description: Owns payment authorization & capture services.
+spec:
+  type: team
+  profile:
+    displayName: Payments
+  children: []
+  members: [guest]

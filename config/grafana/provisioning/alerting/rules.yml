@@ -1,0 +1,225 @@
+# Grafana-managed alert rules (the easy path). Grafana evaluates these by
+# querying datasources directly — metrics from Prometheus AND logs from Loki —
+# and routes firing alerts through the notification policy above.
+#
+# Each rule is: refId A = the query (instant), refId C = a threshold expression.
+# Provisioned rules show a "Provisioned" badge in the UI (read-only there).
+# For ad-hoc alerts, just use Grafana → Alerting → New alert rule (point & click).
+
+apiVersion: 1
+
+groups:
+  - orgId: 1
+    name: core
+    folder: Observability Alerts
+    interval: 1m
+    rules:
+      # ---- A target stopped responding ----------------------------------
+      - uid: obs-target-down
+        title: TargetDown
+        condition: C
+        for: 2m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Target down: {{ $labels.job }} ({{ $labels.instance }})"
+        noDataState: OK
+        execErrState: Alerting
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              expr: up
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            relativeTimeRange: { from: 0, to: 0 }
+            datasourceUid: __expr__
+            model:
+              datasource: { type: __expr__, uid: __expr__ }
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: lt, params: [1] }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { type: last, params: [] }
+                  type: query
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+
+      # ---- High CPU on a host -------------------------------------------
+      - uid: obs-host-high-cpu
+        title: HostHighCpu
+        condition: C
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU on {{ $labels.instance }} (>85% for 10m)"
+        noDataState: OK
+        execErrState: Alerting
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              expr: '100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)'
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            relativeTimeRange: { from: 0, to: 0 }
+            datasourceUid: __expr__
+            model:
+              datasource: { type: __expr__, uid: __expr__ }
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [85] }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { type: last, params: [] }
+                  type: query
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+
+      # ---- High memory on a host ----------------------------------------
+      - uid: obs-host-high-mem
+        title: HostHighMemory
+        condition: C
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory on {{ $labels.instance }} (>90% for 10m)"
+        noDataState: OK
+        execErrState: Alerting
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              expr: '100 * (1 - node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)'
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            relativeTimeRange: { from: 0, to: 0 }
+            datasourceUid: __expr__
+            model:
+              datasource: { type: __expr__, uid: __expr__ }
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [90] }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { type: last, params: [] }
+                  type: query
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+
+      # ---- Error-log spike (alerting on LOGS via Loki) ------------------
+      - uid: obs-error-log-spike
+        title: ErrorLogSpike
+        condition: C
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Error logs spiking in container logs (>10 / 5m)"
+          description: "More than 10 error-level log lines in the last 5 minutes across docker containers."
+        noDataState: OK
+        execErrState: OK
+        data:
+          - refId: A
+            relativeTimeRange: { from: 300, to: 0 }
+            datasourceUid: loki
+            model:
+              datasource: { type: loki, uid: loki }
+              editorMode: code
+              expr: 'sum(count_over_time({job="docker", compose_project!="observability"} |~ "(?i)(error|exception|fatal|panic)" [5m]))'
+              queryType: instant
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: A
+          - refId: C
+            relativeTimeRange: { from: 0, to: 0 }
+            datasourceUid: __expr__
+            model:
+              datasource: { type: __expr__, uid: __expr__ }
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [10] }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { type: last, params: [] }
+                  type: query
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C
+
+      # ---- Per-service high error rate ----------------------------------
+      # Fires per `app` (the label the scrape target stamps on payments_requests_total),
+      # so the firing alert carries app=<service> and lights the "Grafana Alerts"
+      # card on that service's page in Backstage (grafana/alert-label-selector).
+      # Trigger it with: make demo-degrade   (APP_PORT=8001 for ledger-api).
+      - uid: obs-service-high-error-rate
+        title: ServiceHighErrorRate
+        condition: C
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.app }} (>20% for 1m)"
+          description: "Service {{ $labels.app }} is returning >20% errors — check its RED dashboard."
+        noDataState: OK
+        execErrState: OK
+        data:
+          - refId: A
+            relativeTimeRange: { from: 600, to: 0 }
+            datasourceUid: prometheus
+            model:
+              datasource: { type: prometheus, uid: prometheus }
+              editorMode: code
+              expr: 'sum by(app) (rate(payments_requests_total{outcome="error"}[5m])) / clamp_min(sum by(app) (rate(payments_requests_total[5m])), 0.001)'
+              instant: true
+              intervalMs: 1000
+              maxDataPoints: 43200
+              range: false
+              refId: A
+          - refId: C
+            relativeTimeRange: { from: 0, to: 0 }
+            datasourceUid: __expr__
+            model:
+              datasource: { type: __expr__, uid: __expr__ }
+              type: threshold
+              expression: A
+              conditions:
+                - evaluator: { type: gt, params: [0.2] }
+                  operator: { type: and }
+                  query: { params: [C] }
+                  reducer: { type: last, params: [] }
+                  type: query
+              intervalMs: 1000
+              maxDataPoints: 43200
+              refId: C

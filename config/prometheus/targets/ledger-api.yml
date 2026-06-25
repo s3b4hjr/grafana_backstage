@@ -1,0 +1,2 @@
+- targets: ["ledger-api:8000"]
+  labels: { app: ledger-api, env: local }

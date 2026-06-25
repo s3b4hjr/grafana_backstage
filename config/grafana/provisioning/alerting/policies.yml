@@ -1,0 +1,20 @@
+# Notification policy = HOW alerts are routed/grouped to contact points.
+# Edit here, or in Grafana → Alerting → Notification policies.
+
+apiVersion: 1
+
+policies:
+  - orgId: 1
+    receiver: default
+    group_by: ["grafana_folder", "alertname"]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 4h
+    routes:
+      # Critical alerts notify faster and repeat more often.
+      - receiver: default
+        object_matchers:
+          - ["severity", "=", "critical"]
+        group_wait: 10s
+        group_interval: 5m
+        repeat_interval: 1h

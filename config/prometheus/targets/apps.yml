@@ -1,0 +1,26 @@
+# ============================================================================
+# Point your applications here. Prometheus auto-reloads this file (~30s) — no
+# restart, no `make reload-prometheus`. Add as many target groups as you like.
+#
+# Each group: a list of "host:port" metrics endpoints + optional labels.
+# Your app must expose Prometheus metrics (usually at /metrics).
+# ============================================================================
+
+# Example — an app running on the Docker host (Docker Desktop & Linux):
+# - targets:
+#     - host.docker.internal:8000
+#   labels:
+#     app: my-api
+#     env: local
+
+# Example — another container attached to the `observability` network:
+# - targets:
+#     - my-service:9000
+#   labels:
+#     app: my-service
+#     env: local
+
+# Empty group keeps the file valid until you add real targets above.
+- targets: []
+  labels:
+    env: local

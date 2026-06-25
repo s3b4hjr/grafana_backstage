@@ -1,0 +1,85 @@
+# Auto-provisioned datasources with full correlation:
+#   metrics (Prometheus) <-> traces (Tempo) <-> logs (Loki)
+# Fixed UIDs keep dashboards portable across rebuilds.
+
+apiVersion: 1
+
+# We use Grafana's built-in alerting; the standalone Alertmanager is off by
+# default (classic-alerting profile). A datasource pointed at a non-running
+# alertmanager:9093 throws "Bad Gateway" in Alerting → Settings, so we ensure
+# it's removed. (Re-add the commented block below if you enable that profile.)
+deleteDatasources:
+  - name: Alertmanager
+    orgId: 1
+
+datasources:
+  - name: Prometheus
+    uid: prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      httpMethod: POST
+      manageAlerts: true
+      prometheusType: Prometheus
+      # Jump from an exemplar straight into the trace.
+      exemplarTraceIdDestinations:
+        - name: trace_id
+          datasourceUid: tempo
+
+  - name: Loki
+    uid: loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    jsonData:
+      # Turn a trace_id found in a log line into a link to Tempo.
+      derivedFields:
+        - name: trace_id
+          matcherType: regex
+          matcherRegex: '(?:trace_id|traceID|trace.id)["=:\s]+(\w+)'
+          url: '${__value.raw}'
+          datasourceUid: tempo
+          urlDisplayLabel: "View trace"
+
+  - name: Tempo
+    uid: tempo
+    type: tempo
+    access: proxy
+    url: http://tempo:3200
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: loki
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+        filterByTraceID: true
+        filterBySpanID: false
+        tags:
+          - key: service.name
+            value: service_name
+      tracesToMetrics:
+        datasourceUid: prometheus
+        spanStartTimeShift: '-1h'
+        spanEndTimeShift: '1h'
+      serviceMap:
+        datasourceUid: prometheus
+      nodeGraph:
+        enabled: true
+      tracesToProfiles:
+        datasourceUid: ''
+      streamingEnabled:
+        search: true
+
+  # External Alertmanager — only when running the classic-alerting profile
+  # (docker compose --profile classic-alerting up -d). Uncomment AND remove the
+  # deleteDatasources entry above to use it. Day-to-day alerting uses Grafana's
+  # built-in alerting (Alerting menu), which needs no datasource here.
+  # - name: Alertmanager
+  #   uid: alertmanager
+  #   type: alertmanager
+  #   access: proxy
+  #   url: http://alertmanager:9093
+  #   jsonData:
+  #     implementation: prometheus
+  #     handleGrafanaManagedAlerts: false

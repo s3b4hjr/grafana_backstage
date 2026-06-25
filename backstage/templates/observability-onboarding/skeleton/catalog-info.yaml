@@ -1,0 +1,23 @@
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: ${{ values.name }}
+  description: ${{ values.description }}
+  annotations:
+    # --- TechDocs: build docs from the mkdocs.yml in this repo --------------
+    backstage.io/techdocs-ref: dir:.
+
+    # --- Grafana plugin wiring --------------------------------------------
+    # Show dashboards tagged with the service name on the component page.
+    grafana/tag-selector: '${{ values.name }}'
+    # Show firing/normal alerts whose `app` label matches this service.
+    # (The Prometheus target below stamps `app=${{ values.name }}` on the series,
+    #  so Grafana-managed alerts on those series carry the same label.)
+    grafana/alert-label-selector: 'app=${{ values.name }}'
+spec:
+  type: service
+  lifecycle: ${{ values.env }}
+  owner: ${{ values.owner }}
+{%- if values.system %}
+  system: ${{ values.system }}
+{%- endif %}

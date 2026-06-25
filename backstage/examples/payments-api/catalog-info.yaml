@@ -1,0 +1,54 @@
+# Example catalog entities for the payments-api test service.
+# Two entities in one file (separated by `---`): the Component and the API it
+# provides. This is what fills the OVERVIEW / TECHDOCS / APIS tabs in Backstage.
+apiVersion: backstage.io/v1alpha1
+kind: Component
+metadata:
+  name: payments-api
+  description: Handles payment authorization and capture.
+  annotations:
+    # TECHDOCS tab: build docs from the mkdocs.yml co-located with this file.
+    backstage.io/techdocs-ref: dir:.
+    # Grafana cards (dashboards by tag, alerts by label).
+    grafana/tag-selector: 'payments-api'
+    grafana/alert-label-selector: 'app=payments-api'
+  tags: [go, payments]
+spec:
+  type: service
+  lifecycle: prod
+  owner: team-payments
+  system: payments-platform
+  # APIS tab: link the API entity below as "provided".
+  providesApis:
+    - payments-api-openapi
+---
+apiVersion: backstage.io/v1alpha1
+kind: API
+metadata:
+  name: payments-api-openapi
+  description: HTTP API exposed by payments-api.
+spec:
+  type: openapi
+  lifecycle: prod
+  owner: team-payments
+  system: payments-platform
+  # An inline OpenAPI definition — Backstage renders it under the API entity.
+  definition: |
+    openapi: 3.0.0
+    info:
+      title: payments-api
+      version: 1.0.0
+      description: Payment authorization and capture.
+    paths:
+      /pay:
+        get:
+          summary: Authorize a payment
+          responses:
+            '200': { description: authorized }
+            '500': { description: downstream failure }
+      /refund:
+        get:
+          summary: Refund a payment
+          responses:
+            '200': { description: refunded }
+            '500': { description: downstream failure }

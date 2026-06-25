@@ -1,0 +1,15 @@
+# Loads every dashboard JSON dropped into /var/lib/grafana/dashboards
+# (bind-mounted from ./dashboards). Sub-folders become Grafana folders.
+
+apiVersion: 1
+
+providers:
+  - name: default
+    orgId: 1
+    type: file
+    disableDeletion: false
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: true

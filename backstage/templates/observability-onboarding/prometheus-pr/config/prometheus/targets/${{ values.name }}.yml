@@ -1,0 +1,8 @@
+# Managed by the `observability-onboarding` Backstage template. Prometheus'
+# `applications` file_sd job loads every *.yml in this dir and auto-reloads (~30s).
+- targets:
+    - '${{ values.metricsHost }}:${{ values.metricsPort }}'
+  labels:
+    app: ${{ values.name }}
+    env: ${{ values.env }}
+    __metrics_path__: ${{ values.metricsPath }}

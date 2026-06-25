@@ -1,0 +1,17 @@
+# Bootstrap location — a single entry point that fans out to everything the
+# observability stack contributes to the catalog. Register THIS one location in
+# app-config and it pulls in the org model, the domain/system, the example
+# component, and the onboarding template. Targets are relative to this file.
+apiVersion: backstage.io/v1alpha1
+kind: Location
+metadata:
+  name: observability-bootstrap
+  description: Org model + domain/system + example service + onboarding template.
+spec:
+  type: file
+  targets:
+    - ./org.yaml
+    - ./systems.yaml
+    - ../examples/payments-api/catalog-info.yaml
+    - ../examples/ledger-api/catalog-info.yaml
+    - ../templates/observability-onboarding/template.yaml

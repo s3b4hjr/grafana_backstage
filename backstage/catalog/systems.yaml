@@ -1,0 +1,23 @@
+# Grouping model — Domain > System. Components/APIs declare `spec.system`, and
+# Systems declare `spec.domain`, giving you a navigable hierarchy in the portal:
+#
+#   Domain: payments
+#     └── System: payments-platform
+#           ├── Component: payments-api
+#           └── API:       payments-api-openapi
+apiVersion: backstage.io/v1alpha1
+kind: Domain
+metadata:
+  name: payments
+  description: Everything related to moving money.
+spec:
+  owner: team-payments
+---
+apiVersion: backstage.io/v1alpha1
+kind: System
+metadata:
+  name: payments-platform
+  description: Payment authorization & capture services.
+spec:
+  owner: team-payments
+  domain: payments

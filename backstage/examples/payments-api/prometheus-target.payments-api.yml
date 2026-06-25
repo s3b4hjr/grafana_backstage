@@ -1,0 +1,9 @@
+# RENDERED EXAMPLE — what the PR adds to THIS repo as
+#   config/prometheus/targets/payments-api.yml
+# (inputs: metricsHost=host.docker.internal, metricsPort=8000, metricsPath=/metrics, env=prod)
+- targets:
+    - 'host.docker.internal:8000'
+  labels:
+    app: payments-api
+    env: prod
+    __metrics_path__: /metrics

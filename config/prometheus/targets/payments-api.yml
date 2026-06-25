@@ -1,0 +1,8 @@
+# payments-api test service (examples/payments-api-go), running as a container
+# on the `observability` network. This is exactly what the onboarding template's
+# PR would add — dropped here manually so we can test without Backstage running.
+- targets:
+    - 'payments-api:8000'
+  labels:
+    app: payments-api
+    env: local

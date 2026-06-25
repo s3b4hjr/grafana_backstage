@@ -1,0 +1,177 @@
+apiVersion: scaffolder.backstage.io/v1beta3
+kind: Template
+metadata:
+  name: observability-onboarding
+  title: Onboard a service into the Observability Stack
+  description: |
+    Creates (or wires up) a service so it is fully observable in this
+    Grafana/Prometheus/Loki/Tempo stack:
+      • scaffolds a catalog-info.yaml with Grafana dashboard/alert annotations
+      • adds TechDocs (mkdocs) so docs render in the portal
+      • opens a PR on the observability repo adding a Prometheus file_sd target
+        (Prometheus auto-reloads it in ~30s — no restart needed)
+    Logs are collected automatically by Alloy, and traces go to the Alloy OTLP
+    gateway, so this template focuses on the metrics target + the portal wiring.
+  tags:
+    - observability
+    - grafana
+    - prometheus
+    - recommended
+spec:
+  owner: platform
+  type: service
+
+  # ---- Form shown to the developer ---------------------------------------
+  parameters:
+    - title: Service
+      required: [name, owner]
+      properties:
+        name:
+          title: Service name
+          type: string
+          description: Unique, lowercase. Used as catalog name + Prometheus `app` label.
+          pattern: '^[a-z0-9]([a-z0-9-]*[a-z0-9])?$'
+          ui:autofocus: true
+        owner:
+          title: Owner
+          type: string
+          description: Team that owns the service.
+          ui:field: OwnerPicker
+          ui:options:
+            catalogFilter:
+              kind: Group
+        description:
+          title: Description
+          type: string
+          description: One line about what the service does.
+        system:
+          title: System
+          type: string
+          description: System this service belongs to (optional, but recommended).
+          ui:field: EntityPicker
+          ui:options:
+            catalogFilter:
+              kind: System
+
+    - title: Metrics endpoint
+      required: [metricsHost, metricsPort]
+      properties:
+        metricsHost:
+          title: Metrics host
+          type: string
+          description: >-
+            How Prometheus reaches the app. Use `host.docker.internal` for an app
+            on the Docker host, or the container's service name if it joins the
+            `observability` network.
+          default: host.docker.internal
+        metricsPort:
+          title: Metrics port
+          type: integer
+          default: 8000
+        metricsPath:
+          title: Metrics path
+          type: string
+          default: /metrics
+        env:
+          title: Environment label
+          type: string
+          default: local
+          enum: [local, dev, staging, prod]
+
+    - title: Repositories
+      required: [repoUrl]
+      properties:
+        repoUrl:
+          title: New repository for the service
+          type: string
+          description: Where the scaffolded service (catalog-info + docs) is published.
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts: [github.com]
+        observabilityRepoUrl:
+          title: Observability stack repository
+          type: string
+          description: The repo holding this stack; the Prometheus-target PR is opened here.
+          default: github.com?owner=s3b4hjr&repo=grafana
+          ui:field: RepoUrlPicker
+          ui:options:
+            allowedHosts: [github.com]
+
+  # ---- What actually runs (in order) -------------------------------------
+  steps:
+    # 1) Render the service files (catalog-info.yaml + TechDocs) into the workspace.
+    - id: fetch-service
+      name: Render service files
+      action: fetch:template
+      input:
+        url: ./skeleton
+        targetPath: ./service
+        values:
+          name: ${{ parameters.name }}
+          owner: ${{ parameters.owner }}
+          description: ${{ parameters.description }}
+          system: ${{ parameters.system }}
+          env: ${{ parameters.env }}
+          destination: ${{ parameters.repoUrl | parseRepoUrl }}
+
+    # 2) Publish the service repo.
+    - id: publish-service
+      name: Publish service repo
+      action: publish:github
+      input:
+        repoUrl: ${{ parameters.repoUrl }}
+        description: ${{ parameters.description }}
+        defaultBranch: main
+        sourcePath: ./service
+
+    # 3) Register the new component in the Backstage catalog.
+    - id: register
+      name: Register in catalog
+      action: catalog:register
+      input:
+        repoContentsUrl: ${{ steps['publish-service'].output.repoContentsUrl }}
+        catalogInfoPath: /catalog-info.yaml
+
+    # 4) Render the Prometheus file_sd target into a repo-shaped subtree.
+    - id: fetch-target
+      name: Render Prometheus target
+      action: fetch:template
+      input:
+        url: ./prometheus-pr
+        targetPath: ./prometheus-pr
+        values:
+          name: ${{ parameters.name }}
+          metricsHost: ${{ parameters.metricsHost }}
+          metricsPort: ${{ parameters.metricsPort }}
+          metricsPath: ${{ parameters.metricsPath }}
+          env: ${{ parameters.env }}
+
+    # 5) Open a PR on the observability repo adding that target file.
+    #    Prometheus' `applications` file_sd job picks it up ~30s after merge.
+    - id: pr-target
+      name: Open PR adding the Prometheus target
+      action: publish:github:pull-request
+      input:
+        repoUrl: ${{ parameters.observabilityRepoUrl }}
+        branchName: onboard-${{ parameters.name }}
+        title: 'obs: scrape ${{ parameters.name }}'
+        description: |
+          Adds a Prometheus `file_sd` target for **${{ parameters.name }}**
+          (owner: ${{ parameters.owner }}, env: ${{ parameters.env }}).
+
+          Endpoint: `${{ parameters.metricsHost }}:${{ parameters.metricsPort }}${{ parameters.metricsPath }}`
+
+          Generated by the `observability-onboarding` Backstage template. After
+          merge, Prometheus auto-reloads (~30s) — no restart required.
+        sourcePath: ./prometheus-pr
+
+  # ---- Links shown on the success screen ---------------------------------
+  output:
+    links:
+      - title: Service repository
+        url: ${{ steps['publish-service'].output.remoteUrl }}
+      - title: Open in catalog
+        icon: catalog
+        entityRef: ${{ steps['register'].output.entityRef }}
+      - title: Prometheus target PR
+        url: ${{ steps['pr-target'].output.remoteUrl }}
